@@ -10,6 +10,7 @@ export const SITE = {
   },
   /** Canonical site URL used for sitemap, RSS, and Open Graph. Update before production deploy. */
   url: "https://noerror.cc",
+  email: "rick.cao@gmail.com",
   author: {
     en: "Rick Cao",
     zh: "Rick Cao",
@@ -27,6 +28,7 @@ export const SITE = {
   socials: {
     github: "https://github.com/1dca",
     linkedin: "https://www.linkedin.com/in/rick-cao-networking/",
+    email: "rick.cao@gmail.com",
   },
 } as const;
 
@@ -37,9 +39,9 @@ export const SITE = {
  */
 export const GISCUS = {
   repo: "1dca/blog",
-  repoId: "REPLACE_WITH_GISCUS_REPO_ID",
+  repoId: "R_kgDOT0ZNXg",
   category: "Announcements",
-  categoryId: "REPLACE_WITH_GISCUS_CATEGORY_ID",
+  categoryId: "DIC_kwDOT0ZNXs4DDFLI",
   mapping: "pathname",
   reactionsEnabled: "1",
   emitMetadata: "0",
