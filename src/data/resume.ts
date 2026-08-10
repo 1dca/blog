@@ -1,102 +1,79 @@
 import type { Locale } from "../i18n/locales";
 
-export type TimelineItem = {
+export type AboutSection = {
   title: Record<Locale, string>;
-  subtitle: Record<Locale, string>;
-  body?: Record<Locale, string>;
+  body: Record<Locale, string>;
 };
 
-export type ResumeData = {
-  profile: Record<Locale, string>;
-  education: TimelineItem[];
-  experience: TimelineItem[];
-  certifications: { label: Record<Locale, string>; url?: string }[];
-  skills: Record<Locale, string[]>;
+export type AboutData = {
+  /** Short opening under the page title */
+  lead: Record<Locale, string>;
+  sections: AboutSection[];
+  /** Soft chips — tools, topics, interests */
+  into: Record<Locale, string[]>;
 };
 
 /**
- * Replace these entries with your final bilingual resume content.
+ * Casual "About me" copy. Edit this file to update /about and /zh/about.
  */
-export const resume: ResumeData = {
-  profile: {
-    en: "Software engineer focused on shipping maintainable full-stack products. I enjoy clean architecture, developer experience, and clear technical writing.",
-    zh: "专注于交付可维护全栈产品的软件工程师。我关注清晰架构、开发者体验与高质量技术写作。",
+export const about: AboutData = {
+  lead: {
+    en: "Hey — I'm Rick. I spend most of my days deep in networks: designing them, breaking them (on purpose), fixing them, and writing down what I learn.",
+    zh: "你好，我是 Rick。日常基本都泡在网络里：设计、排障、偶尔故意折腾一下，再把学到的东西记下来。",
   },
-  education: [
+  sections: [
     {
       title: {
-        en: "B.S. in Computer Science",
-        zh: "计算机科学学士",
-      },
-      subtitle: {
-        en: "2016 to 2020 at Example University, City, Country",
-        zh: "2016–2020，示例大学，城市，国家",
-      },
-    },
-  ],
-  experience: [
-    {
-      title: {
-        en: "Software Engineer at Example Company",
-        zh: "软件工程师 · 示例公司",
-      },
-      subtitle: {
-        en: "From 2022 to Present at Example Company, City, Country",
-        zh: "2022 至今 · 示例公司 · 城市 · 国家",
+        en: "What I do",
+        zh: "我在做什么",
       },
       body: {
-        en: "Built and maintained production web applications, improved CI/CD reliability, and collaborated with product teams on roadmap delivery.",
-        zh: "负责生产级 Web 应用的设计与维护，提升 CI/CD 稳定性，并与产品团队协作推进路线图交付。",
+        en: "I'm a network engineer focused on data center and campus environments. The work I enjoy most is complex design, clean implementation, and the kind of troubleshooting that feels like a puzzle.",
+        zh: "我是一名偏数据中心和校园网的网络工程师。最喜欢的部分是复杂设计、落地实施，以及那种像解谜一样的故障排查。",
       },
     },
     {
       title: {
-        en: "Junior Developer at Startup Co",
-        zh: "初级开发工程师 · Startup Co",
-      },
-      subtitle: {
-        en: "From 2020 to 2022 at Startup Co, City, Country",
-        zh: "2020–2022 · Startup Co · 城市 · 国家",
+        en: "Where I am now",
+        zh: "现在在哪",
       },
       body: {
-        en: "Delivered frontend features, wrote automated tests, and documented internal APIs for a growing engineering team.",
-        zh: "交付前端功能，编写自动化测试，并为成长中的工程团队完善内部 API 文档。",
+        en: "I work at HKBN as a Lead Specialist (Network). Day to day that means helping shape network solutions and staying close to the messy, real-world problems that show up in production.",
+        zh: "目前在香港宽频做网络专家（Lead Specialist）。日常就是参与网络方案，并跟生产环境里那些真实、棘手的问题较劲。",
       },
     },
-  ],
-  certifications: [
     {
-      label: {
-        en: "Example Cloud Practitioner",
-        zh: "示例云从业者认证",
+      title: {
+        en: "A bit of background",
+        zh: "一点背景",
       },
-      url: "https://example.com/cert",
+      body: {
+        en: "I studied Information and Systems at The Hong Kong Polytechnic University. That mix of systems thinking and hands-on curiosity still shapes how I approach networking work today.",
+        zh: "我在香港理工大学读的是信息与系统。系统和动手这块的训练，到现在也还影响着我看网络问题的方式。",
+      },
     },
   ],
-  skills: {
+  into: {
     en: [
-      "TypeScript",
-      "Python",
-      "Astro",
-      "React",
-      "Node.js",
-      "Cloudflare",
-      "PostgreSQL",
-      "Docker",
-      "CI/CD",
-      "Technical Writing",
+      "Routing & switching",
+      "Network architecture",
+      "Data center",
+      "Campus network",
+      "Automation",
+      "Packet captures",
+      "Troubleshooting",
     ],
     zh: [
-      "TypeScript",
-      "Python",
-      "Astro",
-      "React",
-      "Node.js",
-      "Cloudflare",
-      "PostgreSQL",
-      "Docker",
-      "CI/CD",
-      "技术写作",
+      "路由交换",
+      "网络架构",
+      "数据中心",
+      "校园网",
+      "自动化",
+      "抓包分析",
+      "故障排查",
     ],
   },
 };
+
+/** @deprecated Use `about` — kept for any old imports. */
+export const resume = about;

@@ -20,8 +20,8 @@ export const SITE = {
     zh: "网络工程师",
   },
   intro: {
-    en: "I'm a network engineer with a passion for networking, automation and other things I interest in. This site hosts my resume, selected projects, and technical notes.",
-    zh: "我是一个网络工程师，热衷于网络、 自动化和其他我感兴趣的内容。这里是我的简历、精选项目与技术笔记。",
+    en: "I'm a network engineer with a passion for networking, automation and other things I interest in. This site hosts a bit about me, selected projects, and technical notes.",
+    zh: "我是一个网络工程师，热衷于网络、自动化和其他我感兴趣的内容。这里有一点关于我、精选项目与技术笔记。",
   },
   profileImage: "/profile.webp",
   socialImage: "/social_img.webp",
