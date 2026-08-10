@@ -1,0 +1,44 @@
+---
+import { SITE } from "../config";
+import type { Locale } from "../i18n/locales";
+import { t } from "../i18n/ui";
+import { localePath } from "../i18n/utils";
+
+const { sideBarActiveItemID, locale = "en" } = Astro.props as {
+  sideBarActiveItemID?: string;
+  locale?: Locale;
+};
+const activeClass = "bg-base-300";
+---
+
+<ul class="menu grow shrink menu-md overflow-y-auto">
+  <li>
+    <a class="py-3 text-base" id="home" href={localePath(locale, "/")}>{t(locale, "home")}</a>
+  </li>
+  <li>
+    <a class="py-3 text-base" id="projects" href={localePath(locale, "/projects")}
+      >{t(locale, "projects")}</a
+    >
+  </li>
+  <li>
+    <a class="py-3 text-base" id="blog" href={localePath(locale, "/blog/")}
+      >{t(locale, "blog")}</a
+    >
+  </li>
+  <li>
+    <a class="py-3 text-base" id="cv" href={localePath(locale, "/cv")}>{t(locale, "cv")}</a>
+  </li>
+  <li>
+    <a
+      class="py-3 text-base"
+      href={`mailto:${SITE.email}`}
+      target="_blank"
+      rel="noopener noreferrer">{t(locale, "contact")}</a
+    >
+  </li>
+</ul>
+
+<script define:vars={{ sideBarActiveItemID, activeClass }}>
+  const activeItemElem = document.getElementById(sideBarActiveItemID);
+  activeItemElem && activeItemElem.classList.add(activeClass);
+</script>

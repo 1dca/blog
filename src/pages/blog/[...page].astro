@@ -1,0 +1,15 @@
+---
+import BlogListPage from "../../views/BlogListPage.astro";
+import { BLOG_PAGE_SIZE } from "../../config";
+import { t } from "../../i18n/ui";
+import { getPostsByLocale } from "../../lib/blog";
+
+export async function getStaticPaths({ paginate }) {
+  const posts = await getPostsByLocale("en");
+  return paginate(posts, { pageSize: BLOG_PAGE_SIZE });
+}
+
+const { page } = Astro.props;
+---
+
+<BlogListPage locale="en" page={page} heading={t("en", "blog")} />

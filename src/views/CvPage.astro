@@ -1,0 +1,74 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import TimeLineElement from "../components/cv/TimeLine.astro";
+import { SITE } from "../config";
+import { resume } from "../data/resume";
+import type { Locale } from "../i18n/locales";
+import { t } from "../i18n/ui";
+import { localePath } from "../i18n/utils";
+
+const { locale } = Astro.props as { locale: Locale };
+---
+
+<BaseLayout
+  locale={locale}
+  title={`${t(locale, "cv")} | ${SITE.author[locale]}`}
+  description={resume.profile[locale]}
+  sideBarActiveItemID="cv"
+  alternateUrl={localePath(locale === "en" ? "zh" : "en", "/cv")}
+>
+  <div class="mb-5">
+    <div class="text-3xl w-full font-bold">{t(locale, "profile")}</div>
+  </div>
+  <div class="mb-10 text-justify">{resume.profile[locale]}</div>
+
+  <div class="mb-5">
+    <div class="text-3xl w-full font-bold">{t(locale, "education")}</div>
+  </div>
+  <div class="time-line-container grid gap-4 mb-10">
+    {
+      resume.education.map((item) => (
+        <TimeLineElement title={item.title[locale]} subtitle={item.subtitle[locale]} />
+      ))
+    }
+  </div>
+
+  <div class="mb-5">
+    <div class="text-3xl w-full font-bold">{t(locale, "experience")}</div>
+  </div>
+  <div class="time-line-container mb-10">
+    {
+      resume.experience.map((item) => (
+        <TimeLineElement title={item.title[locale]} subtitle={item.subtitle[locale]}>
+          {item.body?.[locale]}
+        </TimeLineElement>
+      ))
+    }
+  </div>
+
+  <div class="mb-5">
+    <div class="text-3xl w-full font-bold">{t(locale, "certifications")}</div>
+  </div>
+  <ul class="list-disc mx-6 mb-10 grid gap-2">
+    {
+      resume.certifications.map((cert) => (
+        <li>
+          {cert.url ? (
+            <a href={cert.url} target="_blank" rel="noopener noreferrer">
+              {cert.label[locale]}
+            </a>
+          ) : (
+            cert.label[locale]
+          )}
+        </li>
+      ))
+    }
+  </ul>
+
+  <div class="mb-5">
+    <div class="text-3xl w-full font-bold">{t(locale, "skills")}</div>
+  </div>
+  <ul class="list-disc md:columns-5 columns-2 mx-6">
+    {resume.skills[locale].map((skill) => <li>{skill}</li>)}
+  </ul>
+</BaseLayout>

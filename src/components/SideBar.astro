@@ -1,0 +1,44 @@
+---
+import SideBarFooter from "./SideBarFooter.astro";
+import SideBarMenu from "./SideBarMenu.astro";
+import LanguageSwitcher from "./LanguageSwitcher.astro";
+import { SITE } from "../config";
+import type { Locale } from "../i18n/locales";
+import { localePath } from "../i18n/utils";
+
+const {
+  sideBarActiveItemID,
+  locale = "en",
+  alternateUrl = null,
+} = Astro.props as {
+  sideBarActiveItemID?: string;
+  locale?: Locale;
+  alternateUrl?: string | null;
+};
+---
+
+<div class="drawer-side z-40">
+  <label for="my-drawer" class="drawer-overlay"></label>
+  <aside class="px-2 pt-2 h-auto min-h-full w-[19rem] bg-base-200 text-base-content flex flex-col">
+    <div class="w-fit mx-auto mt-5 mb-6">
+      <a href={localePath(locale, "/")}>
+        <div class="avatar transition ease-in-out hover:scale-[102%] block m-auto">
+          <div class="w-[8.5rem]">
+            <img
+              class="mask mask-circle"
+              width="300"
+              height="300"
+              src={SITE.profileImage}
+              alt={SITE.author[locale]}
+            />
+          </div>
+        </div>
+      </a>
+    </div>
+    <SideBarMenu sideBarActiveItemID={sideBarActiveItemID} locale={locale} />
+    <div class="px-4 pb-3">
+      <LanguageSwitcher locale={locale} alternateUrl={alternateUrl} />
+    </div>
+    <SideBarFooter locale={locale} />
+  </aside>
+</div>

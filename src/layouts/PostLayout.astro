@@ -1,0 +1,85 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import Comments from "../components/Comments.astro";
+import dayjs from "dayjs";
+import localizedFormat from "dayjs/plugin/localizedFormat";
+import "dayjs/locale/zh-cn";
+import type { Locale } from "../i18n/locales";
+import { t } from "../i18n/ui";
+import { blogTagPath } from "../i18n/utils";
+
+dayjs.extend(localizedFormat);
+
+export interface Props {
+  title: string;
+  description: string;
+  pubDate: Date;
+  updatedDate?: Date;
+  heroImage?: string;
+  badge?: string;
+  tags?: string[];
+  locale: Locale;
+  translationPath?: string | null;
+}
+
+const {
+  title,
+  description,
+  pubDate,
+  updatedDate,
+  heroImage,
+  badge,
+  tags = [],
+  locale,
+  translationPath = null,
+} = Astro.props;
+
+dayjs.locale(locale === "zh" ? "zh-cn" : "en");
+const displayDate = dayjs(pubDate).format("ll");
+const updatedDisplay = updatedDate ? dayjs(updatedDate).format("ll") : null;
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  image={heroImage}
+  ogType="article"
+  locale={locale}
+  sideBarActiveItemID="blog"
+  translationPath={translationPath}
+>
+  <article class="prose prose-lg max-w-[750px] prose-img:mx-auto">
+    {
+      heroImage && (
+        <img
+          width="750"
+          height="422"
+          src={heroImage}
+          alt={title}
+          class="w-full mb-6 rounded-lg"
+        />
+      )
+    }
+    <h1 class="title my-2 text-4xl font-bold">{title}</h1>
+    {pubDate && <time datetime={pubDate.toISOString()}>{displayDate}</time>}
+    <br />
+    {badge && <span class="badge badge-secondary my-1">{badge}</span>}
+    {
+      tags.map((tag) => (
+        <a href={blogTagPath(locale, tag)} class="badge badge-outline ml-2 no-underline">
+          {tag}
+        </a>
+      ))
+    }
+    {
+      updatedDisplay && (
+        <div>
+          {t(locale, "lastUpdated")} <time datetime={updatedDate!.toISOString()}>{updatedDisplay}</time>
+        </div>
+      )
+    }
+    <div class="divider my-2"></div>
+    <slot />
+  </article>
+  <Comments locale={locale} />
+</BaseLayout>

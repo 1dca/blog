@@ -1,0 +1,73 @@
+---
+import { GISCUS } from "../config";
+import type { Locale } from "../i18n/locales";
+import { t } from "../i18n/ui";
+
+const { locale } = Astro.props as { locale: Locale };
+const giscusLang = locale === "zh" ? "zh-CN" : "en";
+const isConfigured =
+  !GISCUS.repoId.startsWith("REPLACE_") &&
+  !GISCUS.categoryId.startsWith("REPLACE_");
+---
+
+<section class="mt-10" aria-label={t(locale, "comments")}>
+  <h2 class="text-2xl font-bold mb-4">{t(locale, "comments")}</h2>
+  {
+    isConfigured ? (
+      <div class="giscus-wrapper">
+        <script
+          is:inline
+          src="https://giscus.app/client.js"
+          data-repo={GISCUS.repo}
+          data-repo-id={GISCUS.repoId}
+          data-category={GISCUS.category}
+          data-category-id={GISCUS.categoryId}
+          data-mapping={GISCUS.mapping}
+          data-strict="0"
+          data-reactions-enabled={GISCUS.reactionsEnabled}
+          data-emit-metadata={GISCUS.emitMetadata}
+          data-input-position={GISCUS.inputPosition}
+          data-theme="preferred_color_scheme"
+          data-lang={giscusLang}
+          data-loading={GISCUS.loading}
+          crossorigin="anonymous"
+          async
+        />
+        <script is:inline>
+          function syncGiscusTheme() {
+            const theme =
+              document.documentElement.getAttribute("data-theme") === "dark"
+                ? "dark"
+                : "light";
+            const iframe = document.querySelector("iframe.giscus-frame");
+            if (!iframe || !iframe.contentWindow) return;
+            iframe.contentWindow.postMessage(
+              { giscus: { setConfig: { theme } } },
+              "https://giscus.app",
+            );
+          }
+
+          const observer = new MutationObserver(syncGiscusTheme);
+          observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["data-theme"],
+          });
+          window.addEventListener("message", (event) => {
+            if (event.origin !== "https://giscus.app") return;
+            if (event.data?.giscus?.resizeHeight != null) {
+              syncGiscusTheme();
+            }
+          });
+        </script>
+      </div>
+    ) : (
+      <div class="bg-base-200 border-l-4 border-secondary w-full p-4">
+        <p class="font-bold">Giscus</p>
+        <p>
+          Configure <code>GISCUS.repoId</code> and <code>GISCUS.categoryId</code> in
+          <code>src/config.ts</code> after installing the Giscus GitHub App.
+        </p>
+      </div>
+    )
+  }
+</section>

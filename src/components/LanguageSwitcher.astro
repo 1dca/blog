@@ -1,0 +1,21 @@
+---
+import type { Locale } from "../i18n/locales";
+import { t } from "../i18n/ui";
+
+const { locale, alternateUrl = null } = Astro.props as {
+  locale: Locale;
+  alternateUrl?: string | null;
+};
+---
+
+{
+  alternateUrl ? (
+    <a class="btn btn-outline btn-sm w-full" href={alternateUrl}>
+      {t(locale, "switchTo")}
+    </a>
+  ) : (
+    <button class="btn btn-ghost btn-sm w-full opacity-50 cursor-not-allowed" disabled>
+      {t(locale, "switchTo")}
+    </button>
+  )
+}

@@ -1,0 +1,63 @@
+---
+import "../styles/global.css";
+import type { Locale } from "../i18n/locales";
+import { htmlLang } from "../i18n/locales";
+
+export interface Props {
+  title: string;
+  description: string;
+  image?: string;
+  ogType?: string;
+  locale: Locale;
+  alternateUrl?: string | null;
+  canonicalPath?: string;
+}
+
+const {
+  title,
+  description,
+  image = "/social_img.webp",
+  ogType = "website",
+  locale,
+  alternateUrl = null,
+  canonicalPath,
+} = Astro.props;
+
+const canonicalURL = new URL(canonicalPath ?? Astro.url.pathname, Astro.site);
+const imageURL = new URL(image, Astro.site);
+const alternateLocale = locale === "en" ? "zh-CN" : "en";
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<meta name="generator" content={Astro.generator} />
+
+<title>{title}</title>
+<meta name="title" content={title} />
+<meta name="description" content={description} />
+<link rel="canonical" href={canonicalURL} />
+<link rel="alternate" hreflang={htmlLang[locale]} href={canonicalURL} />
+{
+  alternateUrl && (
+    <link
+      rel="alternate"
+      hreflang={alternateLocale}
+      href={new URL(alternateUrl, Astro.site)}
+    />
+  )
+}
+<link rel="alternate" hreflang="x-default" href={new URL("/", Astro.site)} />
+
+<meta property="og:type" content={ogType} />
+<meta property="og:url" content={canonicalURL} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={imageURL} />
+<meta property="og:locale" content={htmlLang[locale].replace("-", "_")} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:url" content={canonicalURL} />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={imageURL} />

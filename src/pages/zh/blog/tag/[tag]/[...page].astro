@@ -1,0 +1,23 @@
+---
+import BlogListPage from "../../../../../views/BlogListPage.astro";
+import { BLOG_PAGE_SIZE } from "../../../../../config";
+import { getPostsByLocale } from "../../../../../lib/blog";
+
+export async function getStaticPaths({ paginate }) {
+  const allPosts = await getPostsByLocale("zh");
+  const allTags = [...new Set(allPosts.flatMap((post) => post.data.tags || []))];
+
+  return allTags.flatMap((tag) => {
+    const filtered = allPosts.filter((post) => post.data.tags?.includes(tag));
+    return paginate(filtered, {
+      params: { tag },
+      pageSize: BLOG_PAGE_SIZE,
+    });
+  });
+}
+
+const { page } = Astro.props;
+const { tag } = Astro.params;
+---
+
+<BlogListPage locale="zh" page={page} heading={`博客 - ${tag}`} />

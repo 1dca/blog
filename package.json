@@ -1,0 +1,30 @@
+{
+  "name": "personal-blog",
+  "description": "Personal resume and technical blog built with Astro and Tailwind CSS, deployed on Cloudflare Pages.",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/markdown-satteri": "^0.3.5",
+    "@astrojs/mdx": "^7.0.5",
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.3",
+    "@tailwindcss/typography": "^0.5.16",
+    "@tailwindcss/vite": "^4.1.11",
+    "astro": "^7.2.0",
+    "daisyui": "^5.0.46",
+    "dayjs": "^1.11.13",
+    "sharp": "^0.34.3",
+    "tailwindcss": "^4.1.11"
+  }
+}
