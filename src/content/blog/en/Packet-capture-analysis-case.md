@@ -4,7 +4,7 @@ description: "How dual-segment packet captures, SACK blocks, and cross-path comp
 pubDate: 2026-07-21
 heroImage: "/post_img.webp"
 badge: "Network"
-tags: ["Packetcapture analysis", "troubleshooting"]
+tags: ["packet-capture", "troubleshooting"]
 translationKey: "smtp-starttls-pmtud-case"
 ---
 
@@ -15,8 +15,6 @@ Quick note from a production troubleshooting session that ate a few hours before
 ## Symptom
 
 - Partial user reports of email delay around ~20 minutes
-
-
 
 ## Topology
 
@@ -63,31 +61,28 @@ Quick note from a production troubleshooting session that ate a few hours before
 +-------------------+
 ```
 
-
-
 ## Root Cause
 
 Certificate-exchange packets were getting lost on the inbound path from Akamai toward the WAN router.
 
 Why that mattered: Akamai is picky about packet size on GRE-style paths — they expect **MSS ≤ 1436** on edge routers (and even lower for VPN concentrators). Oversized segments with DF set don’t fragment; they just disappear.
-Why it is partial impact:
-Other service likely support DF = 0 and inbound traffic not through Akamai.
+
+Why the impact was only partial: some inbound traffic did not go through Akamai.
 
 ## How I found out
 
 1. Checked FW / routing / LTM config and logs — nothing that screamed “this is it.”
 2. App team pointed us at the exact SMTP server that was delaying.
 3. Captured at the same time on server egress, WAN, and internal segments.
-  - Narrowed the failure to the TLS certificate exchange phase.
+   - Narrowed the failure to the TLS certificate exchange phase.
 4. Compared a delayed session vs a healthy one:
-  - Good session: retransmit allowed IP fragmentation (`DF = 0`).
-  - Bad session: DF stayed set (`DF = 1`), so oversized packets could not fragment.
-  - Good session TCP MSS peaked around **1318**; bad session around **1200** (and still didn’t recover cleanly).
-5. Checked Akamai logs — they had the packet-drop record.
-6. Temporary fix: clamp MSS to **1360 or lower** on the affected path.
-7. Service test looked good after that.
-
-
+   - Good session: retransmit allowed IP fragmentation (`DF = 0`).
+   - Bad session: DF stayed set (`DF = 1`), so oversized packets could not fragment.
+   - Good session TCP MSS peaked around **1318**; bad session around **1200**. The smoking gun was not “MSS too high vs Akamai’s 1436 ceiling,” but **DF + silent drop** — the bad path never recovered cleanly even with a smaller MSS.
+5. Used TCP sequence numbers to pin down exactly which packets were dropped. See **3. How cumulative ACK and SACK reveal the gap**.
+6. Checked Akamai logs — they had the packet-drop record.
+7. Temporary fix: clamp MSS to **1360 or lower** on the affected path.
+8. Service test looked good after that.
 
 ## Tech note
 
@@ -104,14 +99,14 @@ Official write-up: [Wireshark Wiki — TCP Relative Sequence Numbers](https://wi
 
 ### 2. How SMTP STARTTLS actually sets up the session
 
-I thoght TLS means every thing encryption. there is unlikely to see anything from packet capture.
-Briefly, server use STARTTLS, which is likely TLS over a normal TCP session port(25)
-DetialS:
+I wasn’t sure at first whether I’d only see encrypted blobs instead of useful protocol state. In practice the server uses STARTTLS: encryption rides on top of a normal TCP session on port 25, so classic TCP analysis still works.
+
+Details:
 
 1. Client connects in cleartext (usually 25 / 587).
 2. `EHLO` → server advertises `STARTTLS`.
 3. Client sends `STARTTLS` → server replies `220 Ready to start TLS`.
-4. Both sides run a normal TLS handshake on that same TCP connection.
+4. Both sides run a normal TLS handshake on that same TCP connection. ← **packets dropped here**; it is still a TCP session, so you can still see ACK, Seq, Flags.
 5. After TLS succeeds, both sides forget pre-TLS SMTP state; client must `EHLO` again over the encrypted channel.
 
 So if the **ServerHello / Certificate** bytes never arrive contiguously on TCP, SMTP never gets a usable TLS session — and the app just looks “slow” or “stuck.”
@@ -123,27 +118,64 @@ Record version:      03 01  (TLS 1.0 at record layer)
 Handshake version:   03 03  (TLS 1.2 inside ClientHello)
 ```
 
-In wirshark, I see the TLS 1.0 that misled me.
-That does **not** mean “client only offered TLS 1.0.” The real problem was that the certificate chain never landed as a complete byte stream.
+In Wireshark, the session showed TLS 1.0 — that really misled me. That does **not** mean “client only offered TLS 1.0.” The real problem was that the certificate chain never landed as a complete byte stream.
 
-### 3. TCP sequence, cumulative ACK, and SACK
+### 3. How cumulative ACK and SACK reveal the gap
 
-Worth having in your head before you open the pcap:
+TCP numbers every byte in a stream. The receiver tells the sender two things:
 
-- With only cumulative ACKs, the sender often learns about **one** hole per RTT. 
-- Selective ACK (SACK) lets the receiver say “I got blocks A–B and C–D, but there’s a gap.” The sender can then retransmit just the missing bits.
+- **Cumulative ACK** — “I have all bytes *before* this number; send me this byte next.”
+- **Selective ACK(SACK)** — “I also received this *later* range out of order.”
 
-In this case, SACK blocks plus the same sequence gap at **two** capture points made the loss pretty undeniablee.
-
-Quick mental math we used:
+In this case, everything between the cumulative ACK and the SACK left edge is **missing**. Let’s visualize it: the client has already received server data up through byte **N−1**. After ClientHello it waits for byte **N** (start of the TLS ServerHello flight).
 
 ```text
-missing = next_server_seq - client_cumulative_ack
+Server byte stream (sequence numbers):
+
+  ... |████████████|░░░░░░░░░░░░|████|
+      received OK   MISSING 2896   received
+      ... N-1       N ... N+2895   N+2896 ... N+4095
+                    ↑              ↑
+              cumulative ACK       SACK left edge
+              (= N)                (= N+2896)
 ```
 
+Legend:
 
+- `█` — received and acknowledged in order
+- `░` — never received (the hole)
+- trailing `█` — received **out of order** (later segment arrived first)
 
-### 4. Vendor-specific MTU / MSS requirements (and why DF bites you)
+#### How I analyzed it
+
+Wireshark made the hole concrete. Packet 22 is a client ACK on port 25 with one SACK block:
+
+![Wireshark TCP SACK block: left edge 4294115359, right edge 4294116559](/blog1/1.png)
+
+From that packet:
+
+| Field | Value |
+| --- | --- |
+| Expected data | `4294112463`–`4294116559` |
+| Cumulative ACK | `4294112463` |
+| SACK block | `4294115359`–`4294116559` |
+| Missing range | `4294112463`–`4294115358` |
+
+```text
+4294115359 − 4294112463 = 2896 bytes missing
+```
+
+That hole alone needs at least two **1448-byte** segments:
+
+```text
+Expected segment 1: SEQ 4294112463, length 1448
+Expected segment 2: SEQ 4294113911, length 1448
+Observed next:      SEQ 4294115359   ← SACK left edge
+```
+
+A **1448-byte** segment with **`DF=1`** had basically no chance of getting through Akamai on this path. Akamai logs later confirmed the drops.
+
+### 4. Vendor-specific MTU / MSS requirements
 
 Tunneling (GRE, IPsec, etc.) eats header budget. Vendors often publish hard MSS ceilings so customer traffic still fits after encapsulation.
 
@@ -183,8 +215,6 @@ The packet-loss conclusion came from that simple arithmetic:
 missing = next_server_seq - client_cumulative_ack
 ```
 
-
-
 ## Takeaway
 
 When TLS “fails to establish,” don’t stop at the TLS decoder. Check whether the TCP byte stream is complete first. Here, **SACK plus identical sequence gaps across two capture points** turned a vague “TLS problem” into a transport-layer evidence trail pointing at MTU-related drops and weak recovery on the failing SMTP path.
@@ -195,4 +225,3 @@ When TLS “fails to establish,” don’t stop at the TLS decoder. Check whethe
 - SMTP STARTTLS: [RFC 3207](https://www.rfc-editor.org/rfc/rfc3207)
 - TCP SACK: [RFC 2018](https://www.rfc-editor.org/rfc/rfc2018)
 - Akamai GRE MSS (1436 / 1380): [https://www.akamai.com/site/en/documents/corporate/akamai-services-descriptions.pdf](https://www.akamai.com/site/en/documents/corporate/akamai-services-descriptions.pdf)
-
