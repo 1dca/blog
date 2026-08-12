@@ -21,8 +21,8 @@ export const projects: Project[] = [
       zh: "网络设备端口追踪器",
     },
     description: {
-      en: "A tool for quickly finding the physical switch port to which a specific device (identified by its IP or MAC address) is connected.",
-      zh: "一个快速查找特定设备（通过 IP 或 MAC 地址识别）连接到的物理交换机端口的工具。",
+      en: "A prototype tool for solving repetitive task in production. The tool collects ARP, MAC, and LLDP/CDP neighbor data from multi-vendor devices, stores them as SQLite snapshots, and traces endpoint attachment by combining ARP resolution, MAC-table filtering, and constrained topology traversal. ",
+      zh: "一个用于解决生产环境重复性任务的工具原型。该工具从多厂商设备收集 ARP、MAC 和 LLDP/CDP 邻居数据，并存储为 SQLite 快照，通过结合 ARP 解析、MAC 表过滤和受限拓扑遍历，追踪终端设备的连接关系。",
     },
     image: "/post_img.webp",
     url: "https://github.com/1dca/endpoint_tracer",

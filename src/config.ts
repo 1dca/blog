@@ -10,7 +10,7 @@ export const SITE = {
   },
   /** Canonical site URL used for sitemap, RSS, and Open Graph. Update before production deploy. */
   url: "https://noerror.cc",
-  email: "rick.cao@gmail.com",
+  email: "ffff.1dca@gmail.com",
   author: {
     en: "Rick Cao",
     zh: "Rick Cao",
@@ -28,7 +28,7 @@ export const SITE = {
   socials: {
     github: "https://github.com/1dca",
     linkedin: "https://www.linkedin.com/in/rick-cao-networking/",
-    email: "rick.cao@gmail.com",
+    email: "ffff.1dca@gmail.com",
   },
 } as const;
 

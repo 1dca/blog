@@ -1,171 +1,165 @@
 ---
-title: "Finding an SMTP STARTTLS Failure with TCP Sequence Analysis"
+title: "Email delay troubleshooting"
 description: "How dual-segment packet captures, SACK blocks, and cross-path comparison exposed a TLS handshake gap caused by likely MTU/PMTUD issues."
-pubDate: 2026-08-11
+pubDate: 2026-07-21
 heroImage: "/post_img.webp"
 badge: "Network"
-tags: ["tcp", "pcap", "smtp", "tls", "mtu", "troubleshooting"]
+tags: ["Packetcapture analysis", "troubleshooting"]
 translationKey: "smtp-starttls-pmtud-case"
 ---
 
-A firewall log reported an SMTP session ending abnormally. Human review suggested TLS could not be established. Packet captures from multiple network segments told a clearer story: **STARTTLS succeeded, but the server’s TLS handshake flight arrived incomplete at the client**.
+Quick note from a production troubleshooting session that ate a few hours before the root cause finally clicked. Users started seeing occasional email delays the day after a network change. We went through the change log and configs more times than I’d like to admit — nothing obvious. What finally told the story was packet captures from multiple segments:
+
+**TLS was failing between the local SMTP server and the external service during the certificate exchange.**
 
 ## Symptom
 
-- Client on the internal mail relay network
-- Failed destination: a third-party SMTP server on port 25
-- Working comparison: a major public mail provider on port 25
+- Partial user reports of email delay around ~20 minutes
 
-Both paths completed:
 
-1. TCP handshake
-2. SMTP banner and `EHLO`
-3. `STARTTLS` and `220 Ready to start TLS`
-4. ClientHello
 
-Only the failed path stalled after ClientHello.
+## Topology
 
-## What looked like TLS failure
+```text
+ Internet
+    |
+    v
++----------------------+
+| 48.218.xx.xx         |
+| External SMTP server |
++----------------------+
+    |
+    v
++----------+
+|  Akamai  |
++----------+
+    |
+    |  *** Capture point 1 ***
+    v
++-------------+
+| WAN Router  |
++-------------+
+    |
+    v
++------+
+|  FW  |
++------+
+    |
+    v
++--------------+
+| Leaf Switch  |
++--------------+
+    |
+    |  *** Capture point 2 ***
+    v
++--------+
+|  LTM   |
++--------+
+    |
+    v
++-------------------+
+| 10.x.x.x          |
+| Local SMTP server |
++-------------------+
+```
 
-Wireshark on the failed capture sometimes labeled traffic as **TLS 1.0**, which was misleading.
 
-The ClientHello used the common compatibility pattern:
+
+## Root Cause
+
+Certificate-exchange packets were getting lost on the inbound path from Akamai toward the WAN router.
+
+Why that mattered: Akamai is picky about packet size on GRE-style paths — they expect **MSS ≤ 1436** on edge routers (and even lower for VPN concentrators). Oversized segments with DF set don’t fragment; they just disappear.
+Why it is partial impact:
+Other service likely support DF = 0 and inbound traffic not through Akamai.
+
+## How I found out
+
+1. Checked FW / routing / LTM config and logs — nothing that screamed “this is it.”
+2. App team pointed us at the exact SMTP server that was delaying.
+3. Captured at the same time on server egress, WAN, and internal segments.
+  - Narrowed the failure to the TLS certificate exchange phase.
+4. Compared a delayed session vs a healthy one:
+  - Good session: retransmit allowed IP fragmentation (`DF = 0`).
+  - Bad session: DF stayed set (`DF = 1`), so oversized packets could not fragment.
+  - Good session TCP MSS peaked around **1318**; bad session around **1200** (and still didn’t recover cleanly).
+5. Checked Akamai logs — they had the packet-drop record.
+6. Temporary fix: clamp MSS to **1360 or lower** on the affected path.
+7. Service test looked good after that.
+
+
+
+## Tech note
+
+A few things worth knowing if you’re the networking person on a case like this.
+
+### 1. Use raw TCP sequence numbers in Wireshark
+
+Wireshark shows **relative** seq/ack by default (first segment of the conversation becomes `0`). That’s nice for reading, but when you compare captures across boxes — or feed numbers into a script — you want the real values from the header.
+
+- Preference: **Edit → Preferences → Protocols → TCP** → untick **Relative sequence numbers**
+- Or keep relative display on and filter/compare with `tcp.seq_raw` / `tcp.ack_raw`
+
+Official write-up: [Wireshark Wiki — TCP Relative Sequence Numbers](https://wiki.wireshark.org/TCP_Relative_Sequence_Numbers)
+
+### 2. How SMTP STARTTLS actually sets up the session
+
+I thoght TLS means every thing encryption. there is unlikely to see anything from packet capture.
+Briefly, server use STARTTLS, which is likely TLS over a normal TCP session port(25)
+DetialS:
+
+1. Client connects in cleartext (usually 25 / 587).
+2. `EHLO` → server advertises `STARTTLS`.
+3. Client sends `STARTTLS` → server replies `220 Ready to start TLS`.
+4. Both sides run a normal TLS handshake on that same TCP connection.
+5. After TLS succeeds, both sides forget pre-TLS SMTP state; client must `EHLO` again over the encrypted channel.
+
+So if the **ServerHello / Certificate** bytes never arrive contiguously on TCP, SMTP never gets a usable TLS session — and the app just looks “slow” or “stuck.”
+
+The ClientHello in our traces used the common compatibility pattern:
 
 ```text
 Record version:      03 01  (TLS 1.0 at record layer)
 Handshake version:   03 03  (TLS 1.2 inside ClientHello)
 ```
 
-The real problem was not “client only offered TLS 1.0.” The **ServerHello and certificate chain never arrived contiguously**.
+In wirshark, I see the TLS 1.0 that misled me.
+That does **not** mean “client only offered TLS 1.0.” The real problem was that the certificate chain never landed as a complete byte stream.
 
-## The smoking gun: a sequence gap
+### 3. TCP sequence, cumulative ACK, and SACK
 
-After ClientHello, the client expected the next server byte at sequence number **N**.
+Worth having in your head before you open the pcap:
 
-The next server segment seen on the wire started at sequence number **N + 2896**.
+- With only cumulative ACKs, the sender often learns about **one** hole per RTT. 
+- Selective ACK (SACK) lets the receiver say “I got blocks A–B and C–D, but there’s a gap.” The sender can then retransmit just the missing bits.
 
-Gap:
+In this case, SACK blocks plus the same sequence gap at **two** capture points made the loss pretty undeniablee.
 
-```text
-2896 bytes missing
-```
-
-The client sent SACK:
+Quick mental math we used:
 
 ```text
-Cumulative ACK: N
-SACK block:     N+2896 to N+4096
+missing = next_server_seq - client_cumulative_ack
 ```
 
-Meaning:
 
-```text
-Missing:               N to N+2895           (2896 bytes)
-Received out-of-order: N+2896 to N+4095       (1200 bytes)
-```
 
-A second retry on another ephemeral client port showed the same pattern with a different sequence range.
+### 4. Vendor-specific MTU / MSS requirements (and why DF bites you)
 
-## Why two packets were inferred
+Tunneling (GRE, IPsec, etc.) eats header budget. Vendors often publish hard MSS ceilings so customer traffic still fits after encapsulation.
 
-On the failed path, TCP timestamps were enabled:
+Akamai Prolexic Routed GRE requirements explicitly call out:
 
-```text
-TCP payload: 1448 bytes
-TCP header:    32 bytes
-IPv4 header:   20 bytes
-Total:       1500-byte IP packet
-```
+> Support for TCP MSS adjustment: **1436 MSS** (edge routers) and **1380 MSS** (VPN concentrators)
 
-So:
+Source: [Akamai Services Descriptions (PDF)](https://www.akamai.com/site/en/documents/corporate/akamai-services-descriptions.pdf)
 
-```text
-2896 ÷ 2 = 1448
-```
-
-Two full-sized server segments were likely dropped. A smaller later segment survived:
-
-```text
-1200-byte TCP payload
-1252-byte IP packet
-DF set
-```
-
-## Cross-capture evidence
-
-The same session was captured at two points along the path:
-
-- An internal load-balancer segment
-- A WAN/router segment closer to the internet edge
-
-Both showed:
-
-| Observation | Internal capture | WAN capture |
-|---|---|---|
-| Client expects next byte | N | N |
-| Next server SEQ seen | N + 2896 | N + 2896 |
-| Later segment size | 1200 bytes | 1200 bytes |
-| Missing range present? | No | No |
-
-Expected but absent packets:
-
-```text
-SEQ N,       len 1448
-SEQ N+1448,  len 1448
-```
-
-Because the gap existed at **both** capture points, the loss likely happened **before traffic reached either segment**, not between them.
-
-## Successful path: same loss, different recovery
-
-The working public mail provider showed almost the same initial loss:
-
-```text
-Expected:     M
-Next seen:    M + 2920
-Missing:      2920 bytes (= 1460 × 2)
-```
-
-The client again sent SACK for the out-of-order block. The difference was recovery:
-
-- The provider retransmitted after a few seconds
-- Retransmissions used **smaller IP packets (~576 bytes)**
-- **DF was cleared** on recovery packets
-- TLS 1.2 completed successfully
-
-Negotiated result on the successful path:
-
-```text
-TLS 1.2
-Modern ECDHE + AES-GCM cipher suite
-```
-
-The failed server sent no visible retransmission of the missing range. The client waited about 90 seconds, closed, and the server eventually returned a late `decode_error` alert after the session was already dead.
-
-## Likely root cause
-
-This pattern fits an **MTU / PMTUD black hole**:
-
-- Large ~1500-byte packets disappear
-- Smaller packets pass
-- DF is set on the surviving traffic
-- ICMP “Fragmentation Needed” was not observed
-- One server recovers with smaller retransmissions; the other does not
-
-Less likely explanations:
-
-- TLS cipher mismatch
-- Certificate rejection
-- SNI mismatch alone
-
-Those usually fail faster and produce clearer TLS alerts, not a long wait with a sequence hole.
+TLS certificate messages are often the first “big” payload after the handshake starts, which is why it looked like a TLS problem.
 
 ## Tools used
 
 Analysis was done with:
 
 - **Python 3 + Scapy** for flow grouping, seq/ack math, SACK/MSS parsing
-- **Raw byte scanning** for one vendor export, because its PCAP wrapper truncated TCP options
 - **Wireshark-style fields** for validation: `tcp.seq_raw`, `tcp.ack_raw`, `tcp.options.sack`
 
 Minimal Scapy pattern:
@@ -183,21 +177,22 @@ for i, p in enumerate(pkts, 1):
           f"seq={t.seq} ack={t.ack}", sacks)
 ```
 
-The packet-loss conclusion came from simple arithmetic:
+The packet-loss conclusion came from that simple arithmetic:
 
 ```python
 missing = next_server_seq - client_cumulative_ack
 ```
 
-## Recommended next steps
 
-1. Capture simultaneously on server egress, WAN, and internal segments.
-2. Check for dropped ICMP type 3 code 4 (“Fragmentation Needed”).
-3. Verify tunnel/interface MTU end-to-end.
-4. Temporarily clamp MSS to **1360 or lower** on the affected path.
-5. Compare server TCP stack behavior: retransmission, PMTUD, and DF handling.
-6. In Wireshark, disable relative TCP sequence numbers when correlating raw seq values across captures.
 
 ## Takeaway
 
-When TLS “fails to establish,” do not stop at the TLS decoder. Check whether the TCP byte stream is complete first. In this case, **SACK plus identical sequence gaps across two capture points** turned a vague “TLS problem” into a transport-layer evidence trail pointing to MTU-related packet loss and poor recovery behavior on the failing SMTP server.
+When TLS “fails to establish,” don’t stop at the TLS decoder. Check whether the TCP byte stream is complete first. Here, **SACK plus identical sequence gaps across two capture points** turned a vague “TLS problem” into a transport-layer evidence trail pointing at MTU-related drops and weak recovery on the failing SMTP path.
+
+## Reference
+
+- Wireshark relative vs raw seq: [https://wiki.wireshark.org/TCP_Relative_Sequence_Numbers](https://wiki.wireshark.org/TCP_Relative_Sequence_Numbers)
+- SMTP STARTTLS: [RFC 3207](https://www.rfc-editor.org/rfc/rfc3207)
+- TCP SACK: [RFC 2018](https://www.rfc-editor.org/rfc/rfc2018)
+- Akamai GRE MSS (1436 / 1380): [https://www.akamai.com/site/en/documents/corporate/akamai-services-descriptions.pdf](https://www.akamai.com/site/en/documents/corporate/akamai-services-descriptions.pdf)
+

@@ -38,8 +38,8 @@ export const about: AboutData = {
         zh: "现在在哪",
       },
       body: {
-        en: "I work at HKBN as a Lead Specialist (Network). Day to day that means helping shape network solutions and staying close to the messy, real-world problems that show up in production.",
-        zh: "目前在香港宽频做网络专家（Lead Specialist）。日常就是参与网络方案，并跟生产环境里那些真实、棘手的问题较劲。",
+        en: "I am a network engineer at a HK local telecom company. Day to day that means helping shape network solutions and staying close to the messy, real-world problems that show up in production.",
+        zh: "目前在香港一家本地电信公司做网络工程师。日常就是参与网络方案，并解決生产环境里那些真实、棘手的问题。",
       },
     },
     {
@@ -48,8 +48,8 @@ export const about: AboutData = {
         zh: "一点背景",
       },
       body: {
-        en: "I studied Information and Systems at The Hong Kong Polytechnic University. That mix of systems thinking and hands-on curiosity still shapes how I approach networking work today.",
-        zh: "我在香港理工大学读的是信息与系统。系统和动手这块的训练，到现在也还影响着我看网络问题的方式。",
+        en: "I studied Information and Systems at Hong Kong Polytechnic University. That mix of systems thinking and hands-on curiosity still shapes how I approach networking work today.",
+        zh: "我曾在香港理工大学读的是信息与系统专业。系统和动手这块的训练，到现在也还影响着我看网络问题的方式。",
       },
     },
   ],
@@ -60,7 +60,6 @@ export const about: AboutData = {
       "Data center",
       "Campus network",
       "Automation",
-      "Packet captures",
       "Troubleshooting",
     ],
     zh: [
@@ -69,7 +68,6 @@ export const about: AboutData = {
       "数据中心",
       "校园网",
       "自动化",
-      "抓包分析",
       "故障排查",
     ],
   },
